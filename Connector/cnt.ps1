@@ -20,6 +20,7 @@ $hypervisors = $config -split "`r`n`r`n";
 $i = 0;
 $hvTab = @();
 $host.UI.RawUI.CursorSize = 0;
+$jobStarted = $false;
 while ($i -lt $hypervisors.Length) {
     $hv = $hypervisors[$i];
     $prm = $hv -split "`r`n";
@@ -28,32 +29,42 @@ while ($i -lt $hypervisors.Length) {
     $sshUser = $prm[3];
     $sshPass = ConvertTo-SecureString $prm[4] -AsPlainText -Force;
     $cred = New-Object System.Management.Automation.PSCredential($sshUser, $sshPass);
-    $job = Start-Job -ArgumentList $sshHost, $cred, $hvName -ScriptBlock {
-        $sshHost = $args[0]; $cred = $args[1]; $hvName = $args[2];
-        try {
-            $sess = New-SSHSession -ComputerName $sshHost -Credential $cred;
-            return $sess
-        } catch { return "err" }
+    if ($jobStarted -eq $false) {
+        $jobStarted = $true;
+        $job = Start-Job -ArgumentList $sshHost, $cred, $hvName -ScriptBlock {
+            $sshHost = $args[0]; $cred = $args[1]; $hvName = $args[2];
+            try {
+                $sess = New-SSHSession -ComputerName $sshHost -Credential $cred;
+                return $sess
+            } catch { return "err" }
+        }    
     }
-    if (($job.Sate -eq "Completed") -and (Receive-Job $job -ne "err")) {
-        $session_tab += $sess
-        $hvTab += @{ vms = @(); name = $hvName; host = $sshHost }    
-        $i++;
+    $crs = $host.UI.RawUI.CursorPosition;
+    if ($job.State -eq "Completed") {
+        $jobRes = Receive-Job $job;
+        $jobStarted = $false;
+        if ($jobRes -ne "err") {
+            $session_tab += $sess;
+            $hvTab += @{ vms = @(); name = $hvName; host = $sshHost }    
+            $i++;
+            $crs.X = 40 + $hvName.Length;
+            $host.UI.RawUI.CursorPosition = $crs;
+            Write-Host "[ Success ] " -ForegroundColor Green
+        }
     } else {
-        $crs = $host.UI.RawUI.CursorPosition;
+        $crs.X = 20 + $hvName.Length;
+        $host.UI.RawUI.CursorPosition = $crs;
+        Write-Host -n "                 ";
+        $crs.X = 0;
+        $host.UI.RawUI.CursorPosition = $crs;
         Write-Host -n "Connexion vers ";
-        Write-Host -n -ForegroundColor Yellow "[ $hvName ]                  ";
+        Write-Host -n -ForegroundColor Yellow "[ $hvName ][                  ]";
         Write-Host -ForegroundColor Red " [ En Cours ]";
-        for ($load = 0; $load -lt 16; $load++) {
+        for ($load = 0; $load -lt 17; $load++) {
             $crs.X = $load + 20 + $hvName.Length;
             $host.UI.RawUI.CursorPosition = $crs;
-            Write-Host -n "=>"
-            Start-Sleep -Milliseconds 80
+            Write-Host -n "=>";
+            Start-Sleep -Milliseconds 80;
         }
-        $crs.X = 20 + $hvName.Length
-        $host.UI.RawUI.CursorPosition = $crs;
-        Write-Host -n "                 "
-        $crs.X = 0
-        $host.UI.RawUI.CursorPosition = $crs;
     }
 }
