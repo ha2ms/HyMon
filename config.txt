@@ -2,16 +2,15 @@ ESXI
 EsxI-Lille
 192.168.40.100
 root
-&_V9)s5K@,m~X&,
+Password_line
 
 ESXI
 Esxi-Santa
 192.168.50.100
 root
-U%Lu70DG1VBG
+Password_line
 
 ESXI
 Esxi-Pekin
 192.168.60.100
-root
-#00!SrVpK1~#
+Password_line
